@@ -53,6 +53,7 @@ export interface WithdrawOptions {
   config: ServerConfigParams
   broadcast: boolean
   gasPrice?: BN
+  withdrawTarget?: string
   useAccountBalance: boolean
 }
 
@@ -357,9 +358,14 @@ export class CommandsLogic {
       const stakeManagerAddress = await relayHub.stakeManager()
       const stakeManager = await this.contractInteractor._createStakeManager(stakeManagerAddress)
       const { owner } = await stakeManager.getStakeInfo(relayManager)
-      if (owner.toLowerCase() !== options.config.ownerAddress.toLowerCase()) {
-        throw new Error(`Owner in relayHub ${owner} is different than in server config ${options.config.ownerAddress}`)
+      if ( options.config.ownerAddress!=null ) {
+        //old (2.1.0) relayers didn't have owners in config. 
+        // but its OK to withdraw from them...
+        if (owner.toLowerCase() !== options.config.ownerAddress.toLowerCase()) {
+          throw new Error(`Owner in relayHub ${owner} is different than in server config ${options.config.ownerAddress}`)
+        }
       }
+      const withdrawTarget = options.withdrawTarget ?? owner
 
       const nonce = await this.contractInteractor.getTransactionCount(relayManager)
       const gasPrice = toHex(options.gasPrice ?? toBN(await this.getGasPrice()))
@@ -372,13 +378,13 @@ export class CommandsLogic {
           throw new Error('Relay manager account balance lower than withdrawal amount')
         }
         const web3TxData = {
-          to: options.config.ownerAddress,
+          to: withdrawTarget,
           value: options.withdrawAmount,
           gas: gasLimit,
           gasPrice,
           nonce
         }
-        console.log('Calling in view mode')
+        console.log('Calling in view mode', web3TxData)
         await this.contractInteractor.web3.eth.call({ ...web3TxData })
         const txData = { ...web3TxData, gasLimit: web3TxData.gas }
         delete txData.gas
@@ -389,7 +395,7 @@ export class CommandsLogic {
         if (balance.lt(options.withdrawAmount)) {
           throw new Error('Relay manager hub balance lower than withdrawal amount')
         }
-        const method = relayHub.contract.methods.withdraw(options.withdrawAmount, owner)
+        const method = relayHub.contract.methods.withdraw(options.withdrawAmount, withdrawTarget)
         const encodedCall = method.encodeABI()
         txToSign = new Transaction({
           to: relayHubAddress,
@@ -421,6 +427,7 @@ export class CommandsLogic {
         transactions
       }
     } catch (e) {
+      console.log(e)
       return {
         success: false,
         transactions,
