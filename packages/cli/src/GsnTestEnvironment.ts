@@ -23,6 +23,11 @@ import { GSNUnresolvedConstructorInput } from '@opengsn/provider/dist/RelayClien
 import { ReputationStoreManager } from '@opengsn/relay/dist/ReputationStoreManager'
 import { ReputationManager } from '@opengsn/relay/dist/ReputationManager'
 import { constants } from '@opengsn/common'
+import {} from 'dotenv/config'
+
+const mnemonic = process.env.MNEMONIC
+
+
 
 export interface TestEnvironment {
   contractsDeployment: GSNContractsDeployment
@@ -47,7 +52,7 @@ class GsnTestEnvironmentClass {
       throw new Error(`startGsn: expected network (${supportedNetworks().join('|')}) or url`)
     }
     const logger = createServerLogger('error', '', '')
-    const commandsLogic = new CommandsLogic(_host, logger, {})
+    const commandsLogic = new CommandsLogic(_host, logger, {}, mnemonic)
     await commandsLogic.init()
     const from = await commandsLogic.findWealthyAccount()
     const deploymentResult = await commandsLogic.deployGsnContracts({
